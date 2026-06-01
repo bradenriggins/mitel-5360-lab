@@ -1,0 +1,17 @@
+static-files/
+research/
+mitel-backups/
+mitel-firmware-downloads/
+mitel-firmware-candidates/
+mitel-probes/
+voice/models/
+voice/voices/
+voice/__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pcap
+*.bin
+*.spx
+.DS_Store
+.env
