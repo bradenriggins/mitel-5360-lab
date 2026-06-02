@@ -194,7 +194,7 @@ The most promising unexplored leads, in rough priority order:
 3. **Try MiNET mode.** The phone can be switched from SIP to MiNET firmware; GRM may only work there.
 4. **Inspect the firmware.** `MainIp5360.bin` likely contains the HTML-app install/launch logic and the conditions under which it fires (see the Firmware section in [`mitel_reverse_engineering_notes.md`](mitel_reverse_engineering_notes.md)).
 
-Full breakdown of everything tried, every served URL, and every config tag is in [`mitel_reverse_engineering_notes.md`](mitel_reverse_engineering_notes.md) — **§"SIP SPX Delivery Breakthrough"** is where the trail currently ends.
+Full breakdown of everything tried, every served URL, and every config tag is in [`mitel_reverse_engineering_notes.md`](mitel_reverse_engineering_notes.md) — **§"SIP SPX Delivery — download confirmed, install unconfirmed"** is where the trail currently ends.
 
 **If you've done this on a 5360, or know the SIP-mode install trigger — please open an issue.**
 

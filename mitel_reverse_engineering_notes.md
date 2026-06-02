@@ -10,9 +10,11 @@
 - Confirmed working: phone web UI, SIP registration, INVITE ringing, CANCEL stop, basic RTP tone after answer.
 - Firmware visible in web UI: main `06.04.01.08`, boot `06.04.00.03`.
 
+**Status of the headline goal (Full Screen GUI Replacement):** *unsolved.* We can build `.spx` packages and the phone reliably *downloads* them over the SIP `html_url`, but we never confirmed the phone *installs and launches* one as a full-screen GUI replacement. The official install step (`HTMLAPPUPGRADE`) is an MCD/3300 flow, and the Toolkit notes mark this feature MiNET-only — our phone is in SIP mode. See "SIP SPX Delivery — download confirmed, install unconfirmed" below for where the trail ends.
+
 ## How Far This Can Go
 
-### Tier 0 - Supported Full GUI Replacement Theory
+### Tier 0 - Full GUI Replacement (documented by Mitel, NOT yet achieved on this SIP-only lab)
 
 Mitel's HTML Toolkit Developer Guide explicitly supports Full Screen GUI Replacement Applications on the 5360. In the official MCD/3300 flow, these are packaged as SPX applications, uploaded through the Mitel HTML Application Uploader, pushed with `HTMLAPPUPGRADE`, and assigned as an HTML GUI application in the 3300 System Administration Tool. The guide says this mode is intended to completely replace the phone user interface, can capture all keys, receives full-screen touch events on touch-capable phones, starts automatically, and is not intended to be exited.
 
@@ -169,7 +171,9 @@ This is the deepest route, but it is explicitly deferred for now because the liv
   - `http://192.168.4.30/files/ApartmentLabGRM.rich.spx`
   - `http://192.168.4.30/files/5360-FullScreenGUISample.spx`
 
-## SIP SPX Delivery Breakthrough
+## SIP SPX Delivery — download confirmed, install unconfirmed
+
+**Summary:** over the SIP-only path we got the phone to reliably *download* a served `.spx`, but never confirmed it *installs/launches* the package as a GUI replacement. This is where the trail currently ends.
 
 - The phone fetches `.spx` packages from the SIP `FeatureConfig` HTML application URL.
 - Confirmed by dashboard/API probe and server log:
