@@ -2,7 +2,7 @@
 
 > Pick up the handset. Talk to an AI. Hear it respond through the earpiece in GLaDOS's voice.
 
-This is a lab for hacking the **Mitel 5360 IP phone** — a vintage enterprise desk phone you can get for ~$10 on eBay. The lab turns it into a full AI terminal: dial an extension, have a conversation with Claude, hear the response synthesized through the phone's speaker. Along the way it also does SIP control, RTP audio injection, HTML GUI replacement, DHCP/TFTP provisioning, and firmware reverse engineering.
+This is a lab for hacking the **Mitel 5360 IP phone** — a vintage enterprise desk phone you can get for ~$10 on eBay. The lab turns it into a full AI terminal: dial an extension, have a conversation with Claude, hear the response synthesized through the phone's speaker. Along the way it also does SIP control, RTP audio injection, custom HTML app serving, DHCP/TFTP provisioning, and firmware reverse engineering.
 
 No Mitel controller (MCD/3300) required. The phone speaks SIP; the lab is a SIP registrar.
 
@@ -16,8 +16,10 @@ No Mitel controller (MCD/3300) required. The phone speaks SIP; the lab is a SIP 
 |---|---|
 | SIP registration, ring, cancel, caller-ID spoofing | ✅ |
 | RTP audio injection (soundboard, TTS, any audio) | ✅ |
-| HTML app serving to the phone's touchscreen | ✅ |
-| Full GUI replacement via official Mitel HTML Toolkit `.spx` packages | ✅ |
+| HTML app serving to the phone (launched via HTML Application key/URL) | ✅ |
+| Building valid `.spx` packages with the official Mitel HTML Toolkit | ✅ |
+| Phone *downloads* a served `.spx` over the SIP `html_url` | ✅ confirmed in logs |
+| **Full GUI Replacement — phone *installs & launches* the `.spx`** | ❌ **unsolved — see [Open problem](#open-problem-full-gui-replacement)** |
 | TFTP/HTTP provisioning + firmware intercept | ✅ |
 | Phone web admin automation (HTTP Basic auth) | ✅ |
 | AI voice bridge: dial → speak → Whisper STT → Claude → GLaDOS TTS → RTP | ✅ |
@@ -151,21 +153,50 @@ done
 
 ---
 
-## HTML Toolkit / Full GUI Replacement
+## Open problem: Full GUI Replacement
 
-The Mitel 5360 supports a **Full Screen GUI Replacement** (GRM) mode where a `.spx` package completely takes over the phone's UI — all physical keys captured, full touchscreen events, always-on display, no way to exit. This is the intended production feature for deploying custom apps on 5360 fleets.
+**This is the unsolved part of the project, and the place where help is most wanted.**
 
-We reverse-engineered the `.spx` packaging format from the official [Mitel HTML Toolkit v2.2.0.4](https://www.mitel.com) and can now build and deploy full GUI replacement apps without a 3300 MCD controller.
+The Mitel 5360 supports a **Full Screen GUI Replacement** (GRM) mode where a `.spx` package completely takes over the phone's UI — all physical keys captured, full touchscreen events, always-on display, no way to exit. In Mitel's documented flow, the `.spx` is uploaded through the Mitel HTML Application Uploader, pushed to the phone with the `HTMLAPPUPGRADE` command, and assigned as the phone's HTML GUI application — **all via a 3300/MCD controller.** This lab has no MCD controller; it's a standalone SIP setup. The open question is whether GRM can be achieved over the network-only/SIP path alone.
 
-```bash
-# Build and deploy a GRM app
-./mitel_package_grm.sh            # produces ApartmentLabGRM.official.spx
-./mitel_package_grm_rich.sh       # richer variant with additional resources
-```
+### What works
 
-The packaging toolchain uses the official `HtmlAppPackagerAndInstaller.jar` from the toolkit. Apps are served over HTTP; the phone fetches and installs them when an HTML Application key is programmed.
+- **Building `.spx` packages.** We extracted the official [Mitel HTML Toolkit v2.2.0.4](https://www.mitel.com), got `HtmlAppPackagerAndInstaller.jar` running under OpenJDK on macOS, and can package signed `.spx` apps from source:
 
-See [`mitel_reverse_engineering_notes.md`](mitel_reverse_engineering_notes.md) for the complete breakdown of what works standalone vs. what needs the MCD deployment path.
+  ```bash
+  ./mitel_package_grm.sh        # produces ApartmentLabGRM.official.spx
+  ./mitel_package_grm_rich.sh   # richer variant with additional resources
+  ```
+
+- **Getting the phone to *download* a `.spx`.** Point the SIP `FeatureConfig` `html_url` (or a boot-time `MN_*.cfg` with `<htmlapp_mandatory_dwnld>1</htmlapp_mandatory_dwnld>`) at a served package, and the phone fetches it. Confirmed in the server logs:
+
+  ```
+  GET /files/5360-FullScreenGUISample.spx   24470 bytes   (Mitel's own sample)
+  GET /files/ApartmentLabGRM.rich.spx        20014 bytes   (our package)
+  ```
+
+- **Serving plain HTML apps** that the phone displays full-screen when launched via a programmed HTML Application key. This is *not* GRM — it's a launchable app, not an always-on UI takeover.
+
+### What does NOT work (yet)
+
+**The phone downloads the `.spx`, but we could never confirm it *installs and launches* it as a Full Screen GUI Replacement.** Over the SIP-only path, the download is observed but no install/launch/UI-takeover ever happened. The likely reasons, unconfirmed:
+
+- GRM install may require the MCD-side `HTMLAPPUPGRADE` control flow and the `/db/htmlapps/apps` FTP path, which a standalone SIP phone may simply never invoke.
+- The Toolkit release notes state supported 53xx sets are **MiNET only** for this feature — our phone is in **SIP** mode, which may not honor the GRM install step at all.
+- `html_url` delivery may only ever *download and cache* the package, not perform the install/launch that startup or an MCD push would.
+
+### If you want to crack this
+
+The most promising unexplored leads, in rough priority order:
+
+1. **Emulate the MCD side.** Stand up the `/db/htmlapps/apps` path and replay the `HTMLAPPUPGRADE` control flow to see if the SIP phone exposes any compatible request path.
+2. **Capture a real GRM install.** If you have access to a 3300/MCD, packet-capture an actual `HTMLAPPUPGRADE` push and diff it against what the SIP phone does on `html_url` download.
+3. **Try MiNET mode.** The phone can be switched from SIP to MiNET firmware; GRM may only work there.
+4. **Inspect the firmware.** `MainIp5360.bin` likely contains the HTML-app install/launch logic and the conditions under which it fires (see the Firmware section in [`mitel_reverse_engineering_notes.md`](mitel_reverse_engineering_notes.md)).
+
+Full breakdown of everything tried, every served URL, and every config tag is in [`mitel_reverse_engineering_notes.md`](mitel_reverse_engineering_notes.md) — **§"SIP SPX Delivery Breakthrough"** is where the trail currently ends.
+
+**If you've done this on a 5360, or know the SIP-mode install trigger — please open an issue.**
 
 ![Phone admin UI](mitel-admin-ui-desktop.png)
 
@@ -182,9 +213,9 @@ See [`mitel_reverse_engineering_notes.md`](mitel_reverse_engineering_notes.md) f
 | `voice/tts_piper.py` | Generic Piper TTS |
 | `voice/glados_phonemizer.py` | GLaDOS-specific phoneme preprocessing |
 | `mitel_lab_control.sh` | Start/stop/status wrapper for lab + DHCP |
-| `mitel_package_grm.sh` | Package HTML app as official `.spx` (basic GRM) |
-| `mitel_package_grm_rich.sh` | Package rich GRM `.spx` |
-| `mitel_package_redirect_fs.sh` | Package redirect/filesystem `.spx` |
+| `mitel_package_grm.sh` | Build a `.spx` package in GRM format (basic) — see [Open problem](#open-problem-full-gui-replacement) |
+| `mitel_package_grm_rich.sh` | Build a richer `.spx` package in GRM format |
+| `mitel_package_redirect_fs.sh` | Build a redirect/filesystem `.spx` package |
 | `mitel_dhcp_responder.py` | DHCP responder for zero-touch provisioning |
 | `mitel_capture_ports.py` | Traffic capture/mirror on phone ports |
 | `mitel_hybrid_probe.py` | Probe the phone's SIP/HTTP/MiNET stack |
